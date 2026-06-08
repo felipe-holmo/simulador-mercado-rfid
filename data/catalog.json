@@ -1,0 +1,12 @@
+[
+  {"rfid": "123456789012", "ean13": "7890000000017", "nome": "Cafe Pilao 500g", "preco": 18.90},
+  {"rfid": "987654321098", "ean13": "7890000000024", "nome": "Leite Itambe 1L", "preco": 5.49},
+  {"rfid": "112233445566", "ean13": "7890000000031", "nome": "Arroz Tio Joao 5kg", "preco": 28.50},
+  {"rfid": "778899001122", "ean13": "7890000000048", "nome": "Feijao Camil 1kg", "preco": 9.90},
+  {"rfid": "554433221100", "ean13": "7890000000055", "nome": "Acucar Uniao 1kg", "preco": 4.99},
+  {"rfid": "667788990011", "ean13": "7890000000062", "nome": "Macarrao Galo 500g", "preco": 6.49},
+  {"rfid": "102030405060", "ean13": "7890000000079", "nome": "Oleo Liza 900ml", "preco": 7.89},
+  {"rfid": "065040302010", "ean13": "7890000000086", "nome": "Sal Cisne 1kg", "preco": 3.29},
+  {"rfid": "999988887777", "ean13": "7890000000093", "nome": "Farinha Dona Benta 1kg", "preco": 5.99},
+  {"rfid": "111122223333", "ean13": "7890000000109", "nome": "Molho Pomarola 340g", "preco": 4.79}
+]
