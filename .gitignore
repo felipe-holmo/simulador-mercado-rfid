@@ -1,0 +1,30 @@
+# Local-only (nao subir pro repo)
+HANDOFF.md
+
+# Material de referencia local (bloqueado por politica nu git-dlp)
+# Manter local; parceiro recebe via Drive/professor.
+docs/
+vendor/
+*.pdf
+*.exe
+
+# macOS
+.DS_Store
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+.venv/
+venv/
+*.egg-info/
+
+# Outputs gerados em runtime (mantem .gitkeep nas subpastas)
+output/relatorios/*.txt
+output/cupons/*.txt
+
+# IDEs
+.vscode/
+.idea/
+*.swp
