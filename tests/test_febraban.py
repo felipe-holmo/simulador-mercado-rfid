@@ -42,6 +42,7 @@ def _montar_linha_digitavel(banco="341", valor_centavos=12345):
 class TestFebraban(unittest.TestCase):
 
     def test_parse_linha_digitavel_47_validos(self):
+        """Parseia linha digitavel de 47 digitos e extrai banco e valor."""
         linha = _montar_linha_digitavel(banco="341", valor_centavos=12345)
         self.assertEqual(len(linha), 47)
         resultado = febraban.parse(linha)
@@ -51,6 +52,7 @@ class TestFebraban(unittest.TestCase):
         self.assertEqual(resultado["codigo_original"], linha)
 
     def test_parse_codigo_barras_44_validos(self):
+        """Parseia codigo de barras de 44 digitos e extrai banco e valor."""
         # 44 digitos: aceito por tamanho (DV Mod 11 nao validado).
         # Estrutura FEBRABAN: banco(3)+moeda(1)+dv(1)+fator_venc(4)+valor(10)+livre(25).
         # Valor em codigo[9:19]; usamos "0000012345" -> R$ 123,45.
@@ -62,6 +64,7 @@ class TestFebraban(unittest.TestCase):
         self.assertAlmostEqual(resultado["valor"], 123.45, places=2)
 
     def test_parse_dv_invalido_levanta(self):
+        """DV Mod 10 invalido faz o parse levantar ValueError."""
         # Pega uma linha valida e troca 1 digito de dados de um campo,
         # invalidando o DV Mod 10.
         linha = list(_montar_linha_digitavel())
@@ -71,10 +74,12 @@ class TestFebraban(unittest.TestCase):
             febraban.parse(linha)
 
     def test_parse_tamanho_errado_levanta(self):
+        """Tamanho fora de 44/47 digitos levanta ValueError."""
         with self.assertRaises(ValueError):
             febraban.parse("123")
 
     def test_extrair_valor_correto(self):
+        """Extrai o valor monetario na posicao certa (casos 47 e 44 digitos)."""
         # 47 digitos: valor em codigo[37:47].
         linha = _montar_linha_digitavel(valor_centavos=12345)
         self.assertAlmostEqual(febraban.extrair_valor(linha), 123.45, places=2)
@@ -84,6 +89,7 @@ class TestFebraban(unittest.TestCase):
         self.assertAlmostEqual(febraban.extrair_valor(codigo44), 123.45, places=2)
 
     def test_parse_codigo_barras_valor_real(self):
+        """Barcode 44-dig oficial: valor lido na posicao FEBRABAN correta."""
         # Cenario realista: scanner fisico le um barcode 44-dig com estrutura
         # oficial FEBRABAN. Documenta a posicao correta do valor (regressao
         # do bug de offset que existia em [5:14]).

@@ -11,6 +11,7 @@ Larguras (validadas contra o template do HANDOFF):
   - Linhas de contadores do relatorio: numero comeca na coluna 26
 """
 
+from collections import Counter
 from datetime import datetime
 from pathlib import Path
 
@@ -36,20 +37,54 @@ def _linha_item(nome, valor):
 
 
 def _formatar_lista_tags(tags, catalogo_por_rfid):
-    """Devolve a lista de tags em ordem estavel, com nome quando disponivel.
+    """Devolve a lista de tags em ordem estavel, com nome e quantidade.
 
-    Tags conhecidas (presentes no catalogo) saem como `Nome (RFID xxx)`.
-    Tags desconhecidas saem so como o RFID. A ordem segue o sorted das
-    tags para garantir output deterministico (mesmo input -> mesmo output).
+    Aceita um Counter (codigo -> quantidade) ou um iteravel de codigos.
+    Tags conhecidas saem como `Nome (RFID xxx) xN` quando N>1, ou apenas
+    `Nome (RFID xxx)` quando N=1. Tags desconhecidas saem so como o RFID
+    (mesma logica de sufixo `xN`). A ordem segue o sorted dos codigos
+    para garantir output deterministico.
     """
+    # Normaliza para dict codigo->qtd: se vier Counter, .items() funciona;
+    # se vier set/list, atribui 1 a cada item.
+    if hasattr(tags, "items"):
+        pares = tags.items()
+    else:
+        pares = ((t, 1) for t in tags)
+    # Materializa para ordenar deterministicamente por codigo.
+    pares = sorted(pares, key=lambda kv: kv[0])
     linhas = []
-    for tag in sorted(tags):
+    for tag, qtd in pares:
         produto = catalogo_por_rfid.get(tag)
         if produto:
-            linhas.append(f"{produto['nome']} (RFID {tag})")
+            base = f"{produto['nome']} (RFID {tag})"
         else:
-            linhas.append(tag)
+            base = tag
+        if qtd > 1:
+            linhas.append(f"{base} x{qtd}")
+        else:
+            linhas.append(base)
     return linhas
+
+
+def _formatar_divergencia(counter, catalogo_por_rfid):
+    """Formata um Counter de codigos divergentes como string de uma linha.
+
+    Mostra `Nome xN` (ou `RFID xN` se nao cadastrado), com codigos em
+    ordem estavel separados por virgula. Quando vazio, retorna "nenhum".
+    """
+    if not counter:
+        return "nenhum"
+    partes = []
+    for codigo in sorted(counter.keys()):
+        qtd = counter[codigo]
+        produto = catalogo_por_rfid.get(codigo)
+        nome = produto["nome"] if produto else codigo
+        if qtd > 1:
+            partes.append(f"{nome} x{qtd}")
+        else:
+            partes.append(nome)
+    return ", ".join(partes)
 
 
 def gerar_relatorio_recebimento(nf, inventario, num_leituras, catalogo):
@@ -58,18 +93,27 @@ def gerar_relatorio_recebimento(nf, inventario, num_leituras, catalogo):
     Argumentos:
       nf            dict carregado de data/nf/*.json
                     (chaves: numero, fornecedor, data, itens_esperados)
-      inventario    set de RFIDs efetivamente lidos pelo leitor
+      inventario    Counter de RFIDs efetivamente lidos pelo leitor
+                    (codigo -> quantidade observada). Tambem aceita set
+                    (assume qtd=1 por codigo) para compatibilidade.
       num_leituras  numero de chamadas a /tags ate convergir
       catalogo      lista de produtos (carregada por catalog.carregar)
 
     Retorna a string formatada (NAO escreve em disco).
     """
-    esperados = set(nf["itens_esperados"])
+    # Normaliza inventario para Counter (aceita set/list para retrocompat).
+    if not isinstance(inventario, Counter):
+        inventario = Counter(inventario)
+    esperados = Counter(nf["itens_esperados"])
     faltando = esperados - inventario
     sobra = inventario - esperados
 
     por_rfid_idx = {p["rfid"]: p for p in catalogo}
     agora = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+    # Totais de tags (somando quantidades) e codigos unicos (cardinalidade).
+    total_esperado = sum(esperados.values())
+    total_inventario = sum(inventario.values())
 
     linhas = []
     linhas.append("=" * LARGURA_SEPARADOR)
@@ -81,8 +125,8 @@ def gerar_relatorio_recebimento(nf, inventario, num_leituras, catalogo):
     linhas.append(f"Data recebimento: {agora}")
     linhas.append("")
     # Os 3 contadores tem o numero comecando na coluna 26 (label + padding ate 25).
-    linhas.append(f"{'Itens esperados (NF):':<25}{len(esperados)}")
-    linhas.append(f"{'Itens recebidos (RFID):':<25}{len(inventario)}")
+    linhas.append(f"{'Itens esperados (NF):':<25}{total_esperado}")
+    linhas.append(f"{'Itens recebidos (RFID):':<25}{total_inventario}")
     linhas.append(f"{'Leituras realizadas:':<25}{num_leituras}")
     linhas.append("")
     linhas.append("-" * LARGURA_SEPARADOR)
@@ -96,16 +140,19 @@ def gerar_relatorio_recebimento(nf, inventario, num_leituras, catalogo):
     linhas.append("-" * LARGURA_SEPARADOR)
     linhas.append("DIVERGENCIAS:")
     # Padding "Faltando:" e "Sobra:   " ate 10 chars para alinhar (HANDOFF secao 7).
-    falt_str = ", ".join(sorted(faltando)) if faltando else "nenhum"
-    sobra_str = ", ".join(sorted(sobra)) if sobra else "nenhum"
+    falt_str = _formatar_divergencia(faltando, por_rfid_idx)
+    sobra_str = _formatar_divergencia(sobra, por_rfid_idx)
     linhas.append(f"  {'Faltando:':<10}{falt_str}")
     linhas.append(f"  {'Sobra:':<10}{sobra_str}")
     linhas.append("")
+    # Soma de quantidades para reportar quantos itens faltam/sobram (nao quantos codigos distintos).
+    total_faltando = sum(faltando.values())
+    total_sobra = sum(sobra.values())
     if not faltando and not sobra:
         linhas.append("STATUS: OK - Inventario completo")
     else:
         linhas.append(
-            f"STATUS: DIVERGENCIA - {len(faltando)} faltando, {len(sobra)} em sobra"
+            f"STATUS: DIVERGENCIA - {total_faltando} faltando, {total_sobra} em sobra"
         )
     linhas.append("=" * LARGURA_SEPARADOR)
     # \n final para o arquivo terminar com newline (convencao POSIX).
@@ -145,7 +192,7 @@ def gerar_cupom(itens, total, timestamp=None):
 
     linhas = []
     linhas.append("=" * LARGURA_SEPARADOR)
-    linhas.append("       MERCADO KAMA (SIMULADO)")
+    linhas.append("       MERCADO MODELO (SIMULADO)")
     linhas.append("=" * LARGURA_SEPARADOR)
     linhas.append(f"Data: {data_fmt}")
     linhas.append("")

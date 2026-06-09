@@ -15,6 +15,7 @@ Exit code:
 import argparse
 import json
 import sys
+from collections import Counter
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -38,9 +39,12 @@ def main():
     inventario, num_leituras = rfid_client.reconciliar(client, verbose=True)
 
     # 3. Comparar inventario lido contra o esperado na NF.
-    esperados = nf["itens_esperados"]
-    faltando = set(esperados) - inventario
-    sobra = inventario - set(esperados)
+    # itens_esperados pode ter codigos repetidos (multiplas unidades do mesmo
+    # produto). Counter - Counter ja cuida das quantidades:
+    #   Counter({A:3}) - Counter({A:1}) == Counter({A:2})
+    esperados = Counter(nf["itens_esperados"])
+    faltando = esperados - inventario
+    sobra = inventario - esperados
 
     # 4. Gerar relatorio, imprimir e salvar.
     conteudo = relatorios.gerar_relatorio_recebimento(nf, inventario, num_leituras, catalogo)

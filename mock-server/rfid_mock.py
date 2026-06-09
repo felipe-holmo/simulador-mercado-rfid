@@ -8,10 +8,13 @@ onde nao podemos rodar o .exe nativamente.
 Comportamento simulado:
 - Endpoint: GET /tags
 - Resposta: JSON {"tags": [...]} com codigos de 12 digitos
-- 10 codigos hardcoded (extraidos do binario)
-- Falhas: cada tag pode nao aparecer em uma leitura (Bernoulli)
-- Duplicatas: cada tag pode aparecer mais de uma vez (Bernoulli)
-- Ordem: aleatoria, simulando ordem de detecao do leitor real
+- TAGS_HARDCODED representa as tags FISICAS presentes no leitor; o mesmo
+  codigo pode aparecer multiplas vezes (varias unidades do mesmo produto).
+  Por isso cada tag fisica e tratada de forma independente: na leitura
+  podem sair varios eventos do mesmo codigo, um por unidade lida.
+- Falhas: cada tag fisica pode nao aparecer em uma leitura (Bernoulli) —
+  obriga multiplas leituras ate o max-merge convergir.
+- Ordem: aleatoria, simulando ordem de detecao do leitor real.
 
 Para trocar pelo .exe real:
 - Basta apontar o cliente para a URL/porta do .exe (que tambem expoe /tags).
@@ -25,45 +28,46 @@ import sys
 import argparse
 
 
-# Codigos extraidos do binario rfid.exe (strings de 12 digitos).
+# Tags FISICAS no leitor. Modelo real: cada tag fisica e uma unidade do
+# produto. Tags com mesmo codigo (mesmo produto, multiplas unidades) sao
+# representadas por entradas repetidas — assim como o rfid.exe original.
+# Composicao: 3x cafe, 2x leite, 1x cada um dos demais => 13 tags fisicas,
+# 10 codigos distintos.
 TAGS_HARDCODED = [
-    "123456789012",
-    "987654321098",
-    "112233445566",
-    "778899001122",
-    "554433221100",
-    "667788990011",
-    "102030405060",
-    "065040302010",
-    "999988887777",
-    "111122223333",
+    "123456789012",  # Cafe Pilao 500g (unidade 1/3)
+    "123456789012",  # Cafe Pilao 500g (unidade 2/3)
+    "123456789012",  # Cafe Pilao 500g (unidade 3/3)
+    "987654321098",  # Leite Itambe 1L (unidade 1/2)
+    "987654321098",  # Leite Itambe 1L (unidade 2/2)
+    "112233445566",  # Arroz Tio Joao 5kg
+    "778899001122",  # Feijao Camil 1kg
+    "554433221100",  # Acucar Uniao 1kg
+    "667788990011",  # Macarrao Galo 500g
+    "102030405060",  # Oleo Liza 900ml
+    "065040302010",  # Sal Cisne 1kg
+    "999988887777",  # Farinha Dona Benta 1kg
+    "111122223333",  # Molho Pomarola 340g
 ]
 
 
-# Probabilidade de cada tag NAO aparecer na leitura (falha de leitura RFID).
-# 0.20 = 20% de chance de perder cada tag => obriga multiplas leituras.
+# Probabilidade de cada tag fisica NAO aparecer na leitura (falha Bernoulli).
+# 0.20 = 20% de chance de perder cada tag => obriga multiplas leituras ate
+# o max-merge convergir para a quantidade fisica real.
 PROB_FALHA = 0.20
-
-# Probabilidade de cada tag aparecer DUPLICADA.
-# 0.15 = 15% de chance => obriga deduplica antes de contar.
-PROB_DUPLICATA = 0.15
 
 
 def gerar_leitura(tags_base):
-    """Gera uma leitura simulada com falhas e duplicatas.
+    """Gera uma leitura simulada com falhas Bernoulli por tag fisica.
 
-    Retorna uma lista (nao um set!) — duplicatas sao intencionais.
+    Cada entrada em tags_base e uma tag fisica independente: pode falhar
+    individualmente (modelo do rfid.exe real). Retorna lista preservando
+    a ordem aleatoria de deteccao.
     """
     leitura = []
     for tag in tags_base:
-        # Simula falha: pula a tag com prob_falha.
         if random.random() < PROB_FALHA:
             continue
         leitura.append(tag)
-        # Simula duplicata: adiciona de novo com prob_duplicata.
-        if random.random() < PROB_DUPLICATA:
-            leitura.append(tag)
-    # Embaralha para simular ordem de deteccao nao-deterministica.
     random.shuffle(leitura)
     return leitura
 

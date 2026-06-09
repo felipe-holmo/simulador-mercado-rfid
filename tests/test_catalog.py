@@ -18,16 +18,19 @@ class TestCatalog(unittest.TestCase):
         self.catalogo = catalog.carregar()
 
     def test_carrega_10_produtos(self):
+        """Catalogo carrega exatamente os 10 produtos da spec."""
         # HANDOFF secao 4 fixa 10 produtos no catalogo.
         self.assertEqual(len(self.catalogo), 10)
 
     def test_indices_completos(self):
+        """Indices por_rfid e por_ean tem 10 entradas cada (sem colisao)."""
         por_rfid_idx, por_ean_idx = catalog.indices(self.catalogo)
         # Sem colisoes nas chaves: 10 produtos -> 10 entradas em cada indice.
         self.assertEqual(len(por_rfid_idx), 10)
         self.assertEqual(len(por_ean_idx), 10)
 
     def test_lookup_por_rfid_existente(self):
+        """Busca por RFID existente retorna o produto certo (Cafe Pilao)."""
         produto = catalog.por_rfid(self.catalogo, "123456789012")
         self.assertIsNotNone(produto)
         self.assertEqual(produto["nome"], "Cafe Pilao 500g")
@@ -35,9 +38,11 @@ class TestCatalog(unittest.TestCase):
         self.assertEqual(produto["preco"], 18.90)
 
     def test_lookup_por_rfid_inexistente_retorna_none(self):
+        """Busca por RFID inexistente retorna None."""
         self.assertIsNone(catalog.por_rfid(self.catalogo, "000000000000"))
 
     def test_lookup_por_ean_existente(self):
+        """Busca por EAN existente retorna o produto certo (Leite Itambe)."""
         produto = catalog.por_ean(self.catalogo, "7890000000024")
         self.assertIsNotNone(produto)
         self.assertEqual(produto["nome"], "Leite Itambe 1L")

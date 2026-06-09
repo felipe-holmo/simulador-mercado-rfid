@@ -2,6 +2,7 @@
 
 import urllib.request
 import json
+from collections import Counter
 
 DEFAULT_RFID_URL = "http://127.0.0.1:3000"
 
@@ -28,9 +29,17 @@ def reconciliar(client: RFIDClient,
                 verbose: bool = True) -> tuple:
     """Le tags repetidamente ate convergir.
 
+    O inventario e um Counter — o RFID emulado expoe produtos duplicados
+    (varias tags fisicas com o MESMO codigo). Cada leitura pode trazer
+    cada tag um numero variavel de vezes por causa de falhas estatisticas
+    de leitura. Mantemos, por codigo, o MAXIMO ja observado entre todas
+    as leituras — esse e o melhor estimador da quantidade real de tags
+    fisicas presentes.
+
     Para quando:
       - ja fizemos >= min_leituras E
-      - as ultimas `paciencia` leituras consecutivas nao trouxeram tag nova.
+      - as ultimas `paciencia` leituras consecutivas nao trouxeram
+        nenhuma contagem nova (nem codigo novo, nem aumento de quantidade).
 
     Possui um teto absoluto (MAX_LEITURAS) para nunca rodar infinito mesmo
     com um mock degenerado; ao bater o teto, retorna o inventario parcial
@@ -38,7 +47,7 @@ def reconciliar(client: RFIDClient,
 
     Retorna (inventario, num_leituras).
     """
-    inventario = set()
+    inventario = Counter()
     num_leituras = 0
     leituras_sem_novidade = 0
 
@@ -46,10 +55,14 @@ def reconciliar(client: RFIDClient,
         tags = client.ler_tags()
         num_leituras += 1
 
-        antes = len(inventario)
-        inventario.update(tags)
-        novas = len(inventario) - antes
-        duplicatas = len(tags) - len(set(tags))
+        leitura = Counter(tags)
+        total_antes = sum(inventario.values())
+        # Max-merge: por codigo, mantemos o maximo ja observado.
+        for codigo, qtd in leitura.items():
+            if qtd > inventario[codigo]:
+                inventario[codigo] = qtd
+        total_depois = sum(inventario.values())
+        novas = total_depois - total_antes
 
         if novas == 0:
             leituras_sem_novidade += 1
@@ -57,21 +70,27 @@ def reconciliar(client: RFIDClient,
             leituras_sem_novidade = 0
 
         if verbose:
-            print(f"Leitura {num_leituras}: {len(tags)} tags "
+            unicos = len(inventario)
+            total_lido = len(tags)
+            print(f"Leitura {num_leituras}: {total_lido} tags "
                   f"({novas} nova{'s' if novas != 1 else ''}, "
-                  f"{duplicatas} duplicata{'s' if duplicatas != 1 else ''})")
+                  f"{unicos} codigo{'s' if unicos != 1 else ''} unico{'s' if unicos != 1 else ''})")
 
         convergiu = num_leituras >= min_leituras and leituras_sem_novidade >= paciencia
         if convergiu:
             if verbose:
+                total = sum(inventario.values())
+                unicos = len(inventario)
                 print(f"Convergiu em {num_leituras} leituras. "
-                      f"Inventario: {len(inventario)} tags unicas.")
+                      f"Inventario: {total} tags ({unicos} codigos unicos).")
             break
 
         if num_leituras >= MAX_LEITURAS:
             if verbose:
+                total = sum(inventario.values())
+                unicos = len(inventario)
                 print(f"AVISO: teto de {MAX_LEITURAS} leituras atingido sem "
-                      f"convergir. Inventario: {len(inventario)} tags unicas.")
+                      f"convergir. Inventario: {total} tags ({unicos} codigos unicos).")
             break
 
     return inventario, num_leituras

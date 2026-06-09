@@ -35,6 +35,13 @@ def main():
 
     def processar_codigo(codigo):
         nonlocal total
+        # Sanitiza: leitores fisicos e operadores costumam enviar espacos,
+        # tracos ou pontos junto com os digitos (linha digitavel impressa).
+        # Exigencia explicita do PDF do trabalho final.
+        codigo = "".join(c for c in codigo if c.isdigit())
+        if not codigo:
+            print("  Codigo invalido: vazio")
+            return
         tipo = detector.detectar(codigo)
         if tipo == "produto":
             p = por_ean.get(codigo)
