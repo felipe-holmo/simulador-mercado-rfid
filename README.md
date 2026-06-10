@@ -33,6 +33,7 @@ automacao-industrial/
 ├── src/                  Modulos do dominio
 │   ├── rfid_client.py    Cliente HTTP do leitor + algoritmo de convergencia
 │   ├── catalog.py        Catalogo de produtos (EAN-13 -> nome/preco)
+│   ├── estoque.py        Banco de estoque (credita no recebimento, debita no caixa)
 │   ├── febraban.py       Parser de boleto (codigo de barras / linha digitavel)
 │   ├── detector.py       Detecta se um codigo lido e produto ou boleto
 │   └── relatorios.py     Geradores de relatorio de recebimento e cupom fiscal
@@ -40,6 +41,7 @@ automacao-industrial/
 │   └── rfid_mock.py      Mock HTTP do leitor RFID (substitui o rfid.exe)
 ├── data/
 │   ├── catalog.json      Catalogo de produtos cadastrados
+│   ├── estoque.json      Banco de estoque (gerado em runtime; nao versionado)
 │   └── nf/               Notas fiscais de teste (3 cenarios)
 ├── tests/                Testes unitarios (unittest)
 └── output/               Saidas geradas em runtime
@@ -76,11 +78,18 @@ python bin\recebimento.py --nf data\nf\nf_001_normal.json
 
 O programa faz multiplas leituras do mock ate o estoque convergir
 (algoritmo de max-merge), compara com a NF e gera o relatorio em
-`output\relatorios\`.
+`output\relatorios\`. Alem disso, **credita o que chegou fisicamente no
+estoque** (`data\estoque.json`) - esse e o banco que o caixa consome.
+
+> Use `--reset-estoque` para zerar o estoque antes de creditar (util em
+> demos, evita acumular o mesmo recebimento varias vezes).
 
 ### Processo 2 - Caixa
 
-Nao precisa do mock RFID.
+Nao precisa do mock RFID, mas **consome o estoque** abastecido pelo
+recebimento: a cada venda da **baixa** no `data\estoque.json`. Um produto
+sem saldo nao e vendido (mensagem `SEM ESTOQUE`). Por isso, rode o
+recebimento ao menos uma vez antes do caixa.
 
 **Modo interativo** (digite codigos um por linha, encerre com `FIM`):
 
@@ -94,7 +103,8 @@ python bin\caixa.py
 python bin\caixa.py --arquivo compra_teste.txt
 ```
 
-O cupom e impresso na tela e salvo em `output\cupons\`.
+O cupom e impresso na tela e salvo em `output\cupons\`, e a baixa do
+estoque e persistida em `data\estoque.json`.
 
 ---
 

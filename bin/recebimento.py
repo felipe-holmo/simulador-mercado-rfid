@@ -20,13 +20,15 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from src import catalog, rfid_client, relatorios
+from src import catalog, rfid_client, relatorios, estoque
 
 
 def main():
     parser = argparse.ArgumentParser(description="Recebimento: reconcilia RFID contra NF")
     parser.add_argument("--nf", required=True, help="Path para NF JSON")
     parser.add_argument("--rfid-url", default="http://127.0.0.1:3000")
+    parser.add_argument("--reset-estoque", action="store_true",
+                        help="Zera o estoque antes de creditar (util para demos)")
     args = parser.parse_args()
 
     # 1. Carregar catalogo e NF.
@@ -52,7 +54,28 @@ def main():
     path = relatorios.salvar_relatorio(conteudo, nf["numero"])
     print(f"Relatorio salvo em: {path}")
 
-    # 5. Exit code: 0 quando tudo bate, 1 quando ha qualquer divergencia.
+    # 5. Creditar o que chegou FISICAMENTE no estoque (o "banco").
+    # O inventario e por RFID; convertemos RFID -> EAN-13 pelo catalogo,
+    # pois o estoque (consumido pelo caixa) e chaveado por EAN-13.
+    banco = {} if args.reset_estoque else estoque.carregar()
+    por_rfid_idx, _ = catalog.indices(catalogo)
+    creditadas = 0
+    nao_cadastradas = Counter()
+    for rfid_code, qtd in inventario.items():
+        produto = por_rfid_idx.get(rfid_code)
+        if produto:
+            estoque.creditar(banco, produto["ean13"], produto["nome"], qtd)
+            creditadas += qtd
+        else:
+            nao_cadastradas[rfid_code] += qtd
+    estoque_path = estoque.salvar(banco)
+    print(f"Estoque atualizado: +{creditadas} unidade(s) creditada(s) em {estoque_path}")
+    if nao_cadastradas:
+        total_nc = sum(nao_cadastradas.values())
+        print(f"  Aviso: {total_nc} tag(s) sem cadastro no catalogo NAO foram "
+              f"estocadas: {', '.join(sorted(nao_cadastradas))}")
+
+    # 6. Exit code: 0 quando tudo bate, 1 quando ha qualquer divergencia.
     if faltando or sobra:
         sys.exit(1)
     sys.exit(0)

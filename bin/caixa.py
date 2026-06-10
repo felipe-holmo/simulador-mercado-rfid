@@ -18,7 +18,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from src import catalog, febraban, detector, relatorios
+from src import catalog, febraban, detector, relatorios, estoque
 
 
 def main():
@@ -29,6 +29,11 @@ def main():
     cat = catalog.carregar()
     por_rfid, por_ean = catalog.indices(cat)  # ordem segue secao 5.1
     # caixa usa apenas por_ean (cliente escaneia EAN-13 ou barcode FEBRABAN, nao RFID)
+
+    # Banco de estoque (abastecido pelo recebimento). A baixa e feita numa
+    # copia em memoria durante a venda e persistida ao finalizar (FIM):
+    # uma venda = uma transacao.
+    banco = estoque.carregar()
 
     itens = []
     total = 0.0
@@ -48,9 +53,15 @@ def main():
             if not p:
                 print(f"  Produto nao cadastrado: {codigo}")
                 return
+            # Da baixa no estoque. Sem saldo => nao vende (estoque manda).
+            if not estoque.debitar(banco, codigo, 1):
+                print(f"  SEM ESTOQUE: {p['nome']} (saldo: "
+                      f"{estoque.quantidade(banco, codigo)}) - venda nao registrada")
+                return
             itens.append({"tipo": "produto", **p})
             total += p["preco"]
-            print(f"  -> {p['nome']} - R$ {p['preco']:.2f}")
+            restante = estoque.quantidade(banco, codigo)
+            print(f"  -> {p['nome']} - R$ {p['preco']:.2f}  [estoque restante: {restante}]")
         elif tipo in ("boleto_barra", "boleto_linha"):
             try:
                 b = febraban.parse(codigo)
@@ -80,10 +91,14 @@ def main():
                 break
             processar_codigo(codigo)
 
+    # Persiste a baixa do estoque (uma venda = uma transacao).
+    estoque_path = estoque.salvar(banco)
+
     conteudo = relatorios.gerar_cupom(itens, total)
     path = relatorios.salvar_cupom(conteudo)
     print(conteudo)
     print(f"\nCupom salvo em: {path}")
+    print(f"Estoque atualizado em: {estoque_path}")
 
 
 if __name__ == "__main__":
