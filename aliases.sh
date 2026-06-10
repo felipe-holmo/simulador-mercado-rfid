@@ -11,7 +11,6 @@
 #     rfid.exe                                   # sobe o leitor RFID falso (mock)
 #     recebimento --nf data/nf/nf_001_normal.json
 #     caixa                                      # abre o caixa (interativo)
-#     testes                                     # roda a suite de testes
 
 # Descobre a raiz do projeto a partir da localizacao deste arquivo
 # (idioma compativel com bash e zsh).
@@ -26,17 +25,16 @@ else
 fi
 
 # --- Comandos principais ---------------------------------------------------
-alias caixa="$_kama_py \"$KAMA_ROOT/bin/caixa.py\""
-alias recebimento="$_kama_py \"$KAMA_ROOT/bin/recebimento.py\""
-alias rfid.exe="$_kama_py \"$KAMA_ROOT/mock-server/rfid_mock.py\""
-alias mock="$_kama_py \"$KAMA_ROOT/mock-server/rfid_mock.py\""
-alias testes="$_kama_py \"$KAMA_ROOT/run_tests.py\""
+alias caixa="$_kama_py \"$KAMA_ROOT/caixa.py\""
+alias recebimento="$_kama_py \"$KAMA_ROOT/recebimento.py\""
+alias rfid.exe="$_kama_py \"$KAMA_ROOT/rfid_mock.py\""
+alias mock="$_kama_py \"$KAMA_ROOT/rfid_mock.py\""
 
 # --- Cenarios prontos de recebimento (NF por caminho absoluto) -------------
 # Funcionam de qualquer diretorio; exigem o leitor (rfid.exe) rodando.
-alias receber-normal="$_kama_py \"$KAMA_ROOT/bin/recebimento.py\" --nf \"$KAMA_ROOT/data/nf/nf_001_normal.json\""
-alias receber-falta="$_kama_py \"$KAMA_ROOT/bin/recebimento.py\" --nf \"$KAMA_ROOT/data/nf/nf_002_com_falta.json\""
-alias receber-sobra="$_kama_py \"$KAMA_ROOT/bin/recebimento.py\" --nf \"$KAMA_ROOT/data/nf/nf_003_com_sobra.json\""
+alias receber-normal="$_kama_py \"$KAMA_ROOT/recebimento.py\" --nf \"$KAMA_ROOT/data/nf/nf_001_normal.json\""
+alias receber-falta="$_kama_py \"$KAMA_ROOT/recebimento.py\" --nf \"$KAMA_ROOT/data/nf/nf_002_com_falta.json\""
+alias receber-sobra="$_kama_py \"$KAMA_ROOT/recebimento.py\" --nf \"$KAMA_ROOT/data/nf/nf_003_com_sobra.json\""
 
 # --- Ajuda -----------------------------------------------------------------
 ajuda() {
@@ -51,7 +49,6 @@ Comandos do simulador de mercado (raiz: $KAMA_ROOT):
   receber-falta       Atalho: recebimento com a NF 002 (cenario com falta).
   receber-sobra       Atalho: recebimento com a NF 003 (cenario com sobra).
   caixa               Abre o caixa (interativo). Use --arquivo X p/ modo batch.
-  testes              Roda a suite de testes com log detalhado.
   ajuda               Mostra esta lista.
 
 Fluxo tipico de demonstracao:

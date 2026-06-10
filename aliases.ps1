@@ -11,7 +11,6 @@
 #     rfid.exe                                   # sobe o leitor RFID falso (mock)
 #     recebimento --nf data\nf\nf_001_normal.json
 #     caixa                                      # abre o caixa (interativo)
-#     testes                                     # roda a suite de testes
 
 # Raiz do projeto (a partir da localizacao deste arquivo).
 $KamaRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
@@ -24,17 +23,16 @@ if (Get-Command python -ErrorAction SilentlyContinue) {
 }
 
 # --- Comandos principais ---------------------------------------------------
-function caixa       { & $script:KamaPy "$KamaRoot\bin\caixa.py" @args }
-function recebimento { & $script:KamaPy "$KamaRoot\bin\recebimento.py" @args }
-function rfid.exe    { & $script:KamaPy "$KamaRoot\mock-server\rfid_mock.py" @args }
-function mock        { & $script:KamaPy "$KamaRoot\mock-server\rfid_mock.py" @args }
-function testes      { & $script:KamaPy "$KamaRoot\run_tests.py" @args }
+function caixa       { & $script:KamaPy "$KamaRoot\caixa.py" @args }
+function recebimento { & $script:KamaPy "$KamaRoot\recebimento.py" @args }
+function rfid.exe    { & $script:KamaPy "$KamaRoot\rfid_mock.py" @args }
+function mock        { & $script:KamaPy "$KamaRoot\rfid_mock.py" @args }
 
 # --- Cenarios prontos de recebimento (NF por caminho absoluto) -------------
 # Funcionam de qualquer diretorio; exigem o leitor (rfid.exe) rodando.
-function receber-normal { & $script:KamaPy "$KamaRoot\bin\recebimento.py" --nf "$KamaRoot\data\nf\nf_001_normal.json" @args }
-function receber-falta  { & $script:KamaPy "$KamaRoot\bin\recebimento.py" --nf "$KamaRoot\data\nf\nf_002_com_falta.json" @args }
-function receber-sobra  { & $script:KamaPy "$KamaRoot\bin\recebimento.py" --nf "$KamaRoot\data\nf\nf_003_com_sobra.json" @args }
+function receber-normal { & $script:KamaPy "$KamaRoot\recebimento.py" --nf "$KamaRoot\data\nf\nf_001_normal.json" @args }
+function receber-falta  { & $script:KamaPy "$KamaRoot\recebimento.py" --nf "$KamaRoot\data\nf\nf_002_com_falta.json" @args }
+function receber-sobra  { & $script:KamaPy "$KamaRoot\recebimento.py" --nf "$KamaRoot\data\nf\nf_003_com_sobra.json" @args }
 
 # --- Ajuda -----------------------------------------------------------------
 function ajuda {
@@ -49,7 +47,6 @@ Comandos do simulador de mercado (raiz: $KamaRoot):
   receber-falta       Atalho: recebimento com a NF 002 (cenario com falta).
   receber-sobra       Atalho: recebimento com a NF 003 (cenario com sobra).
   caixa               Abre o caixa (interativo). Use --arquivo X p/ modo batch.
-  testes              Roda a suite de testes com log detalhado.
   ajuda               Mostra esta lista.
 
 Fluxo tipico de demonstracao:

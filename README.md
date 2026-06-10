@@ -27,34 +27,27 @@ boletos sao digitados/colados no terminal.
 
 ```
 automacao-industrial/
-├── bin/                  Entry-points executaveis
-│   ├── recebimento.py    Processo 1: concilia RFID com NF
-│   └── caixa.py          Processo 2: caixa (produtos e boletos)
-├── src/                  Modulos do dominio
-│   ├── rfid_client.py    Cliente HTTP do leitor + algoritmo de convergencia
-│   ├── catalog.py        Catalogo de produtos (EAN-13 -> nome/preco)
-│   ├── estoque.py        Banco de estoque (credita no recebimento, debita no caixa)
-│   ├── febraban.py       Parser de boleto (codigo de barras / linha digitavel)
-│   ├── detector.py       Detecta se um codigo lido e produto ou boleto
-│   └── relatorios.py     Geradores de relatorio de recebimento e cupom fiscal
-├── mock-server/
-│   └── rfid_mock.py      Mock HTTP do leitor RFID (substitui o rfid.exe)
-├── data/
-│   ├── catalog.json      Catalogo de produtos cadastrados
-│   ├── estoque.json      Banco de estoque (gerado em runtime; nao versionado)
-│   └── nf/               Notas fiscais de teste (3 cenarios)
-├── tests/                Testes unitarios (unittest)
-└── output/               Saidas geradas em runtime
-    ├── relatorios/       Relatorios de recebimento
-    └── cupons/           Cupons fiscais do caixa
+├── recebimento.py    Processo 1: concilia RFID com NF e abastece o estoque
+├── caixa.py          Processo 2: caixa (produtos e boletos) com baixa de estoque
+├── rfid_mock.py      Mock HTTP do leitor RFID (substitui o rfid.exe)
+├── sistema.py        Nucleo do dominio (catalogo, estoque, detector,
+│                     febraban, leitor RFID e formatacao das saidas)
+└── data/
+    ├── catalog.json  Catalogo de produtos cadastrados
+    ├── estoque.json  Banco de estoque (gerado em runtime; nao versionado)
+    └── nf/           Notas fiscais de teste (3 cenarios)
 ```
+
+> O relatorio de recebimento e o cupom do caixa sao impressos no **terminal**
+> (nao sao gravados em arquivo). O unico estado persistido em runtime e o
+> estoque (`data/estoque.json`).
 
 ---
 
 ## Como rodar
 
-> **Windows:** use `python` e barras invertidas (`bin\recebimento.py`).
-> **macOS/Linux:** use `python3` e barras normais (`bin/recebimento.py`).
+> **Windows:** use `python` e barras invertidas (`data\nf\...`).
+> **macOS/Linux:** use `python3` e barras normais (`data/nf/...`).
 >
 > Os exemplos abaixo usam o formato Windows.
 
@@ -65,7 +58,7 @@ Precisa de **duas janelas** do terminal abertas simultaneamente.
 **Janela 1** - iniciar o mock do leitor RFID:
 
 ```
-python mock-server\rfid_mock.py
+python rfid_mock.py
 ```
 
 Servidor sobe em `http://127.0.0.1:3000/tags` e deve ficar rodando.
@@ -73,13 +66,13 @@ Servidor sobe em `http://127.0.0.1:3000/tags` e deve ficar rodando.
 **Janela 2** - rodar a conciliacao contra uma NF:
 
 ```
-python bin\recebimento.py --nf data\nf\nf_001_normal.json
+python recebimento.py --nf data\nf\nf_001_normal.json
 ```
 
-O programa faz multiplas leituras do mock ate o estoque convergir
-(algoritmo de max-merge), compara com a NF e gera o relatorio em
-`output\relatorios\`. Alem disso, **credita o que chegou fisicamente no
-estoque** (`data\estoque.json`) - esse e o banco que o caixa consome.
+O programa faz multiplas leituras do mock ate o inventario convergir
+(algoritmo de max-merge), compara com a NF e **imprime o relatorio no
+terminal**. Alem disso, **credita o que chegou fisicamente no estoque**
+(`data\estoque.json`) - esse e o banco que o caixa consome.
 
 > Use `--reset-estoque` para zerar o estoque antes de creditar (util em
 > demos, evita acumular o mesmo recebimento varias vezes).
@@ -94,17 +87,17 @@ recebimento ao menos uma vez antes do caixa.
 **Modo interativo** (digite codigos um por linha, encerre com `FIM`):
 
 ```
-python bin\caixa.py
+python caixa.py
 ```
 
 **Modo arquivo** (le codigos de um `.txt`):
 
 ```
-python bin\caixa.py --arquivo compra_teste.txt
+python caixa.py --arquivo compra_teste.txt
 ```
 
-O cupom e impresso na tela e salvo em `output\cupons\`, e a baixa do
-estoque e persistida em `data\estoque.json`.
+O cupom e impresso na tela e a baixa do estoque e persistida em
+`data\estoque.json`.
 
 ---
 
@@ -123,34 +116,15 @@ com tracos, pontos ou espacos (sao limpos automaticamente).
 
 ---
 
-## Testes
+## Atalhos (opcional)
 
-Suite com `unittest` (biblioteca padrao):
+Para simplificar o uso manual, ha atalhos de terminal. Carregue uma vez por
+sessao e use comandos curtos (`rfid.exe`, `recebimento`, `caixa`, etc.):
 
-```
-python -m unittest discover tests
-```
+- **macOS/Linux (zsh/bash) e Git Bash:** `source aliases.sh`
+- **Windows (PowerShell):** `. .\aliases.ps1`
 
-Cobertura inclui: cliente RFID e algoritmo de convergencia, parser FEBRABAN
-(barra e linha digitavel, validacao de DV), catalogo de produtos e detector
-de tipo de codigo.
-
-### Log detalhado (recomendado para o grupo)
-
-Para um log didatico no terminal - mostra, teste a teste, o que esta sendo
-verificado, o resultado (PASSOU/FALHOU) e, em caso de falha, o motivo
-completo - use o runner `run_tests.py`:
-
-```
-python run_tests.py            # log completo, teste a teste
-python run_tests.py --quieto   # so o resumo final
-```
-
-> No macOS/Linux use `python3` no lugar de `python`.
-
-Tambem usa apenas a biblioteca padrao (nao precisa instalar nada). As cores
-desligam sozinhas quando a saida nao e um terminal; para forcar sem cores,
-rode com `NO_COLOR=1 python run_tests.py`.
+Depois rode `ajuda` para ver todos os comandos disponiveis.
 
 ---
 

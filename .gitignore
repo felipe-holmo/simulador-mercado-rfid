@@ -21,10 +21,6 @@ __pycache__/
 venv/
 *.egg-info/
 
-# Outputs gerados em runtime (mantem .gitkeep nas subpastas)
-output/relatorios/*.txt
-output/cupons/*.txt
-
 # Estoque (banco) gerado/mutado em runtime pelo recebimento e pelo caixa
 data/estoque.json
 

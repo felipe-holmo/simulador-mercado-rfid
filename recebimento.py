@@ -1,11 +1,12 @@
 """Entry-point Processo 1 (Recebimento).
 
-Reconcilia o inventario lido pelo leitor RFID contra a Nota Fiscal esperada
-e gera um relatorio de recebimento (terminal + arquivo TXT).
+Reconcilia o inventario lido pelo leitor RFID contra a Nota Fiscal esperada,
+imprime o relatorio de recebimento no terminal e credita o que chegou
+fisicamente no estoque (data/estoque.json).
 
 Uso:
-  python3 bin/recebimento.py --nf data/nf/nf_001_normal.json
-  python3 bin/recebimento.py --nf data/nf/nf_002_com_falta.json --rfid-url http://127.0.0.1:8080
+  python3 recebimento.py --nf data/nf/nf_001_normal.json
+  python3 recebimento.py --nf data/nf/nf_002_com_falta.json --reset-estoque
 
 Exit code:
   0  se nao houver divergencia (inventario bate com a NF)
@@ -16,11 +17,8 @@ import argparse
 import json
 import sys
 from collections import Counter
-from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).parent.parent))
-
-from src import catalog, rfid_client, relatorios, estoque
+import sistema
 
 
 def main():
@@ -32,43 +30,35 @@ def main():
     args = parser.parse_args()
 
     # 1. Carregar catalogo e NF.
-    catalogo = catalog.carregar()
+    catalogo = sistema.carregar_catalogo()
     with open(args.nf, "r", encoding="utf-8") as f:
         nf = json.load(f)
 
     # 2. Ler o leitor RFID ate o inventario convergir.
-    client = rfid_client.RFIDClient(args.rfid_url)
-    inventario, num_leituras = rfid_client.reconciliar(client, verbose=True)
+    client = sistema.RFIDClient(args.rfid_url)
+    inventario, num_leituras = sistema.reconciliar(client, verbose=True)
 
-    # 3. Comparar inventario lido contra o esperado na NF.
-    # itens_esperados pode ter codigos repetidos (multiplas unidades do mesmo
-    # produto). Counter - Counter ja cuida das quantidades:
-    #   Counter({A:3}) - Counter({A:1}) == Counter({A:2})
+    # 3. Comparar inventario lido contra o esperado na NF (Counter - Counter).
     esperados = Counter(nf["itens_esperados"])
     faltando = esperados - inventario
     sobra = inventario - esperados
 
-    # 4. Gerar relatorio, imprimir e salvar.
-    conteudo = relatorios.gerar_relatorio_recebimento(nf, inventario, num_leituras, catalogo)
-    print(conteudo)
-    path = relatorios.salvar_relatorio(conteudo, nf["numero"])
-    print(f"Relatorio salvo em: {path}")
+    # 4. Gerar e imprimir o relatorio (apenas no terminal).
+    print(sistema.gerar_relatorio_recebimento(nf, inventario, num_leituras, catalogo))
 
-    # 5. Creditar o que chegou FISICAMENTE no estoque (o "banco").
-    # O inventario e por RFID; convertemos RFID -> EAN-13 pelo catalogo,
-    # pois o estoque (consumido pelo caixa) e chaveado por EAN-13.
-    banco = {} if args.reset_estoque else estoque.carregar()
-    por_rfid_idx, _ = catalog.indices(catalogo)
+    # 5. Creditar o que chegou fisicamente no estoque (RFID -> EAN-13).
+    banco = {} if args.reset_estoque else sistema.estoque_carregar()
+    por_rfid_idx, _ = sistema.indices(catalogo)
     creditadas = 0
     nao_cadastradas = Counter()
     for rfid_code, qtd in inventario.items():
         produto = por_rfid_idx.get(rfid_code)
         if produto:
-            estoque.creditar(banco, produto["ean13"], produto["nome"], qtd)
+            sistema.estoque_creditar(banco, produto["ean13"], produto["nome"], qtd)
             creditadas += qtd
         else:
             nao_cadastradas[rfid_code] += qtd
-    estoque_path = estoque.salvar(banco)
+    estoque_path = sistema.estoque_salvar(banco)
     print(f"Estoque atualizado: +{creditadas} unidade(s) creditada(s) em {estoque_path}")
     if nao_cadastradas:
         total_nc = sum(nao_cadastradas.values())
